@@ -1,46 +1,169 @@
-# PreTraining BabyBERT From Scratch 👶🚀
+# 🧠 Pretraining BabyBERT From Scratch
 
-This repository is a deep-dive exploration into the internal mechanics of the **BERT (Bidirectional Encoder Representations from Transformers)** architecture. Developed as part of the **IBM Generative AI: Language Modeling with Transformers** course, this project focuses on building and pre-training a "BabyBERT" model from the ground up using PyTorch.
+This repository is a **hands-on deep dive into the internal mechanics of BERT (Bidirectional Encoder Representations from Transformers)**.  
+As part of the **IBM Generative AI: Language Modeling with Transformers** course, this project implements and **pretrains a compact “BabyBERT” model entirely from scratch using PyTorch**.
 
-## 📌 Project Overview
-The goal of this project is to demonstrate how BERT learns to understand language context through self-supervised learning. Instead of using a massive 12-layer model, we implement a smaller version (**BabyBERT**) to keep training efficient while retaining the core logic of the original paper.
-
-### Key Learning Objectives:
-* **Data Preprocessing:** Implementing custom data pipelines for BERT-style inputs.
-* **Tokenization:** Utilizing `transformers.BertTokenizer` for subword encoding.
-* **Architectural Mastery:** Understanding the role of the `[CLS]` and `[SEP]` tokens.
-* **Pre-training Tasks:** Implementing **Masked Language Modeling (MLM)** and **Next Sentence Prediction (NSP)**.
+Rather than using a large 12-layer pretrained BERT, this project focuses on a **minimal, educational implementation** that preserves the **core pretraining objectives of BERT** while remaining computationally efficient and easy to understand.
 
 ---
 
-## 🏗️ Architecture & Core Concepts
+## 📌 Project Motivation
 
-### 1. The [CLS] Token
-In this implementation, we use the `[CLS]` (Classification) token as a global summary of the input sequence. After passing through the Transformer layers, the final hidden state of this token is used for the **NSP task**.
+BERT is often treated as a black box.  
+This project breaks that abstraction by:
 
-### 2. Masked Language Modeling (MLM)
-Masking is the secret sauce that makes BERT bidirectional. 
-* **How it works:** We randomly mask 15% of the input tokens.
-* **The Goal:** The model must predict the original tokens based only on the context provided by non-masked words.
-* **Why Masking?** Unlike standard models that read left-to-right, masking forces BERT to look at both the left and right context simultaneously to "fill in the blanks."
+- Building **BERT-style inputs manually**
+- Creating a **custom pretraining dataset**
+- Training a **transformer encoder from random initialization**
+- Implementing **MLM + NSP losses from scratch**
 
+The goal is **conceptual clarity**, not leaderboard performance.
 
+---
 
-### 3. Next Sentence Prediction (NSP)
-To understand the relationship between different sentences, the model is trained to predict if Sentence B logically follows Sentence A. We use the `[SEP]` token to delineate sentence boundaries.
+## 🧠 Key Learning Objectives
+
+- Understand **bidirectional self-attention**
+- Learn how **[CLS] and [SEP] tokens** are used
+- Implement **Masked Language Modeling (MLM)**
+- Implement **Next Sentence Prediction (NSP)**
+- Train a transformer model **without pretrained weights**
+
+---
+
+## 📂 Dataset Creation (IMDB → BERT Pretraining CSV)
+
+The IMDB dataset was refined into a **BERT-ready CSV dataset** with explicit supervision for both pretraining tasks.
+
+### 📑 CSV Schema
+
+| Column Name      | Description |
+|------------------|-------------|
+| `bert_input`     | Tokenized input sequence with randomly masked tokens |
+| `bert_label`     | Original tokens (MLM targets) |
+| `segment_label`  | Segment IDs (Sentence A / Sentence B) |
+| `is_next`        | NSP label (1 = next sentence, 0 = random sentence) |
+
+- **15% of tokens** are randomly masked
+- Sentence pairs are generated for NSP
+- Dataset is directly usable for BERT-style pretraining
+
+---
+
+## 📊 Kaggle Dataset
+
+The complete preprocessed dataset is publicly available:
+
+🔗 **Kaggle Dataset**  
+https://www.kaggle.com/datasets/rajveergup1455/bert-dataset
+
+This enables **reproducible BERT pretraining experiments**.
+
+---
+
+## 🏗️ BabyBERT Architecture
+
+A lightweight transformer model that mirrors the **core structure of BERT**.
+
+### 🔹 Configuration
+
+- **Vocabulary Size:** 147,161
+- **Embedding Dimension:** 10
+- **Transformer Layers:** 2
+- **Attention Heads:** Multi-head self-attention
+- **Training Objectives:** MLM + NSP
+- **Parallelism:** `torch.nn.DataParallel`
+
+---
+
+### 🔍 Full Model Architecture
+
+```text
+DataParallel(
+  (module): BERT(
+    (embedding): BERTEmbedding(
+      (token_embedding): TokenEmbedding(
+        (embedding): Embedding(147161, 10)
+      )
+      (positional_encoding): PositionalEncoding(
+        (dropout): Dropout(p=0.1)
+      )
+      (segment_embedding): Embedding(3, 10)
+      (dropout): Dropout(p=0.1)
+    )
+
+    (encoder): TransformerEncoder(
+      (layers): ModuleList(
+        (0-1): 2 x TransformerEncoderLayer(
+          (self_attn): MultiheadAttention(
+            (out_proj): Linear(10 → 10)
+          )
+          (linear1): Linear(10 → 2048)
+          (linear2): Linear(2048 → 10)
+          (norm1): LayerNorm(10)
+          (norm2): LayerNorm(10)
+          (dropout): Dropout(p=0.1)
+        )
+      )
+    )
+
+    (encoder_norm): LayerNorm(10)
+
+    (nsp_head): Sequential(
+      Linear(10 → 10)
+      GELU
+      Dropout(p=0.1)
+      Linear(10 → 2)
+    )
+
+    (mlm_transform): Sequential(
+      Linear(10 → 10)
+      GELU
+      LayerNorm(10)
+    )
+
+    (mlm_decoder): Linear(10 → 147161)
+
+    (dropout): Dropout(p=0.1)
+  )
+)
+## 🚀 Training Details
+
+| Setting | Value |
+|--------|------|
+| Dataset | IMDB-based BERT CSV (Kaggle) |
+| Training Type | Pretraining from scratch |
+| Objectives | Masked Language Modeling (MLM) + Next Sentence Prediction (NSP) |
+| Epochs | 100 |
+| Optimizer | Adam |
+| Framework | PyTorch |
+| Parallel Training | `torch.nn.DataParallel` |
+
+The model is initialized with **random weights** and learns contextual representations purely through **self-supervised learning objectives**.
+
+---
+
+## 🧪 Pretraining Tasks Explained
+
+### 🔹 Masked Language Modeling (MLM)
+
+- **15% of input tokens** are randomly masked  
+- The model predicts the original tokens using **both left and right context**  
+- Enables **true bidirectional language understanding**
+
+---
+
+### 🔹 Next Sentence Prediction (NSP)
+
+- The model predicts whether **Sentence B logically follows Sentence A**
+- Uses the **`[CLS]` token representation** for binary classification
+- Helps the model learn **sentence-level coherence and relationships**
 
 ---
 
 ## 🛠️ Tech Stack
-* **Framework:** [PyTorch](https://pytorch.org/)
-* **Tokenization:** `transformers.BertTokenizer` (Hugging Face)
-* **Data Handling:** `torchtext` & `torch.utils.data.DataLoader`
-* **Course Context:** Part of the *IBM Generative AI Specialization*.
 
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-```bash
-pip install torch transformers torchtext
+- **Framework:** PyTorch   
+- **Data Handling:** `torchtext`, `torch.utils.data.DataLoader`  
+- **Parallelism:** `torch.nn.DataParallel`  
+- **Course Context:** IBM Generative AI Specialization

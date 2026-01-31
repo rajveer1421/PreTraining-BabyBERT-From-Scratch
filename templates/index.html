@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BabyBERT | NLP Model Demo</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="background-animation"></div>
+    
+    <div class="container">
+        <header class="header">
+            <div class="logo">
+                <span class="logo-icon">🧠</span>
+                <h1>BabyBERT</h1>
+            </div>
+            <p class="subtitle">Pre-trained Transformer Model for NLP Tasks</p>
+            <div class="badge-container">
+                <span class="badge">PyTorch</span>
+                <span class="badge">Transformers</span>
+                <span class="badge">IBM GenAI Course</span>
+            </div>
+        </header>
+
+        <main class="cards-container">
+            <div class="card" id="mlm-card">
+                <div class="card-header">
+                    <div class="card-icon">🎭</div>
+                    <h2>Masked Language Modeling</h2>
+                </div>
+                <p class="card-description">Test the model's understanding by predicting masked words. Use [MASK] token to hide words.</p>
+                
+                <div class="input-group">
+                    <label for="mlm-input">Enter text with [MASK] token:</label>
+                    <textarea id="mlm-input" placeholder="Example: The quick brown [MASK] jumps over the lazy dog"></textarea>
+                </div>
+                
+                <button class="btn btn-primary" onclick="predictMLM()">
+                    <span class="btn-icon">✨</span>
+                    Predict Masked Word
+                </button>
+                
+                <div class="result-container" id="mlm-result">
+                    <div class="result-placeholder">
+                        <span>🔮</span>
+                        <p>Predictions will appear here</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" id="nsp-card">
+                <div class="card-header">
+                    <div class="card-icon">🔗</div>
+                    <h2>Next Sentence Prediction</h2>
+                </div>
+                <p class="card-description">Test if the model can predict whether two sentences follow each other logically.</p>
+                
+                <div class="input-group">
+                    <label for="sentence1">First Sentence:</label>
+                    <input type="text" id="sentence1" placeholder="Example: I went to the store yesterday">
+                </div>
+                
+                <div class="input-group">
+                    <label for="sentence2">Second Sentence:</label>
+                    <input type="text" id="sentence2" placeholder="Example: I bought some groceries">
+                </div>
+                
+                <button class="btn btn-secondary" onclick="predictNSP()">
+                    <span class="btn-icon">🔍</span>
+                    Analyze Relationship
+                </button>
+                
+                <div class="result-container" id="nsp-result">
+                    <div class="result-placeholder">
+                        <span>🔮</span>
+                        <p>Analysis will appear here</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <p>Built with ❤️ as part of IBM Generative AI: Language Modeling with Transformers</p>
+            <p class="tech-stack">PyTorch • Hugging Face Transformers • Flask</p>
+        </footer>
+    </div>
+
+    <script>
+        async function predictMLM() {
+            const text = document.getElementById('mlm-input').value;
+            const resultDiv = document.getElementById('mlm-result');
+            
+            if (!text.includes('[MASK]')) {
+                resultDiv.innerHTML = '<div class="error">Please include [MASK] token in your text</div>';
+                return;
+            }
+            
+            resultDiv.innerHTML = '<div class="loading"><div class="spinner"></div><p>Analyzing...</p></div>';
+            
+            try {
+                const response = await fetch('/predict_mlm', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({text: text})
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    resultDiv.innerHTML = '<div class="error">' + data.error + '</div>';
+                    return;
+                }
+                
+                let html = '<div class="predictions">';
+                html += '<h3>Top Predictions:</h3>';
+                
+                data.predictions.forEach((pred, idx) => {
+                    html += '<div class="prediction-group">';
+                    html += '<span class="mask-label">MASK ' + (idx + 1) + ':</span>';
+                    html += '<div class="prediction-tokens">';
+                    pred.top_predictions.forEach((token, i) => {
+                        html += '<span class="token" style="animation-delay: ' + (i * 0.1) + 's">' + token + '</span>';
+                    });
+                    html += '</div></div>';
+                });
+                
+                html += '</div>';
+                resultDiv.innerHTML = html;
+                
+            } catch (error) {
+                resultDiv.innerHTML = '<div class="error">Error connecting to server</div>';
+            }
+        }
+        
+        async function predictNSP() {
+            const sentence1 = document.getElementById('sentence1').value;
+            const sentence2 = document.getElementById('sentence2').value;
+            const resultDiv = document.getElementById('nsp-result');
+            
+            if (!sentence1 || !sentence2) {
+                resultDiv.innerHTML = '<div class="error">Please enter both sentences</div>';
+                return;
+            }
+            
+            resultDiv.innerHTML = '<div class="loading"><div class="spinner"></div><p>Analyzing relationship...</p></div>';
+            
+            try {
+                const response = await fetch('/predict_nsp', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({sentence1: sentence1, sentence2: sentence2})
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    resultDiv.innerHTML = '<div class="error">' + data.error + '</div>';
+                    return;
+                }
+                
+                const resultClass = data.is_next ? 'success' : 'warning';
+                const icon = data.is_next ? '✅' : '❌';
+                
+                let html = '<div class="nsp-result ' + resultClass + '">';
+                html += '<div class="result-icon">' + icon + '</div>';
+                html += '<h3>' + data.prediction + '</h3>';
+                html += '<div class="confidence-bars">';
+                html += '<div class="confidence-item">';
+                html += '<span>Follow</span>';
+                html += '<div class="bar-container"><div class="bar follow" style="width: ' + data.confidence.follow + '%"></div></div>';
+                html += '<span>' + data.confidence.follow + '%</span>';
+                html += '</div>';
+                html += '<div class="confidence-item">';
+                html += '<span>Not Follow</span>';
+                html += '<div class="bar-container"><div class="bar not-follow" style="width: ' + data.confidence.not_follow + '%"></div></div>';
+                html += '<span>' + data.confidence.not_follow + '%</span>';
+                html += '</div>';
+                html += '</div></div>';
+                
+                resultDiv.innerHTML = html;
+                
+            } catch (error) {
+                resultDiv.innerHTML = '<div class="error">Error connecting to server</div>';
+            }
+        }
+    </script>
+</body>
+</html>
